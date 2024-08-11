@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Restake } from "../target/types/restake";
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL, Keypair } from "@solana/web3.js";
 
 describe("restake", () => {
   // Configure the client to use the local cluster.
@@ -11,13 +11,16 @@ describe("restake", () => {
   const provider = anchor.getProvider();
   const connection = provider.connection;
 
-  it("Creates a stake account and sets the withdraw authority to the program PDA", async () => {
+  it("Creates and unstakes a stake account", async () => {
     // Amount of lamports to stake
     const lamports = 0.5 * LAMPORTS_PER_SOL;
 
+    // Generate a keypair for the stake account
+    const stakeAccount = Keypair.generate();
+
     // Derive the PDA for the stake account
-    const [stakeAccountPDA, _stakeBump] = await PublicKey.findProgramAddress(
-      [Buffer.from("stake3"), provider.wallet.publicKey.toBuffer()],
+    const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
+      [Buffer.from("stake5"), provider.wallet.publicKey.toBuffer()],
       program.programId
     );
 
@@ -27,7 +30,9 @@ describe("restake", () => {
       program.programId
     );
 
-    // Create the stake account using the program
+    console.log("ProgramPDA as withdrawer auth: ", programPDA);
+
+    // Create the stake account and stake lamports
     try {
       const tx = await program.methods
         .createStakeAccount(new anchor.BN(lamports))
@@ -36,20 +41,18 @@ describe("restake", () => {
           stakeAccount: stakeAccountPDA,
           systemProgram: SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-          programPda: programPDA, // Pass the PDA as withdraw authority
+          stakeProgram: anchor.web3.StakeProgram.programId,
+          programPda: programPDA,
+          clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
         })
         .signers([provider.wallet.payer]) // Only the initializer signs
         .rpc();
 
-      console.log("Stake account creation transaction signature", tx);
+      console.log("Transaction signature", tx);
 
       // Check the balance of the stake account
       const balance = await connection.getBalance(stakeAccountPDA);
       console.log(`Stake account balance: ${balance / LAMPORTS_PER_SOL} SOL`);
-
-      // Fetch the stake account details (if needed for verification)
-      const accountInfo = await connection.getAccountInfo(stakeAccountPDA);
-      console.log("Stake account info:", accountInfo);
 
     } catch (err) {
       console.error("Transaction failed with error:", err);

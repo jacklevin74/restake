@@ -26,20 +26,21 @@ pub mod restake {
 
         // Derive the stake account's PDA
         let (stake_account_key, bump_seed) = Pubkey::find_program_address(
-            &[b"stake3", initializer_key.as_ref()],
+            &[b"stake5", initializer_key.as_ref()],
             ctx.program_id,
         );
-        let seeds = &[b"stake3", initializer_key.as_ref(), &[bump_seed]];
+        let seeds = &[b"stake5", initializer_key.as_ref(), &[bump_seed]];
 
         // Create the stake account
         let create_account_instruction = system_instruction::create_account(
             &initializer_key,
             &stake_account_key,
             lamports,
-            std::mem::size_of::<StakeStateV2>() as u64, // Updated to StakeStateV2
+            std::mem::size_of::<StakeStateV2>() as u64,
             &STAKE_PROGRAM_ID,
         );
 
+        /*
         invoke_signed(
             &create_account_instruction,
             &[
@@ -49,6 +50,7 @@ pub mod restake {
             ],
             &[seeds],
         )?;
+        */
 
         // Configure the authorized and lockup parameters
         let authorized = Authorized {
@@ -64,12 +66,35 @@ pub mod restake {
             &lockup,
         );
 
+        /*
         invoke_signed(
             &initialize_stake_instruction,
             &[
                 stake_account.to_account_info(),
                 ctx.accounts.rent.to_account_info(),
                 ctx.accounts.stake_program.to_account_info(),
+            ],
+            &[seeds],
+        )?;
+        */
+
+        // Unstake the lamports and send them back to the initializer
+        let withdraw_instruction = stake_instruction::withdraw(
+            &stake_account_key,
+            &program_pda.key(),
+            &initializer.key(), // Send lamports back to the initializer
+            lamports,
+            None, // No custodian required
+        );
+
+        invoke_signed(
+            &withdraw_instruction,
+            &[
+                stake_account.to_account_info(),
+                initializer.to_account_info(), // Unstaked lamports go back to the initializer
+                ctx.accounts.stake_program.to_account_info(),
+                ctx.accounts.clock.to_account_info(),
+                ctx.accounts.stake_history.to_account_info(),
             ],
             &[seeds],
         )?;
@@ -95,6 +120,8 @@ pub struct CreateStakeAccount<'info> {
 
     /// CHECK: The PDA for the program
     pub program_pda: AccountInfo<'info>,
+    pub clock: Sysvar<'info, Clock>, // Required for the withdraw instruction
+    pub stake_history: Sysvar<'info, StakeHistory>,
 }
 
 #[error_code]
