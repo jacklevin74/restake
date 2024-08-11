@@ -26,10 +26,10 @@ pub mod restake {
 
         // Derive the stake account's PDA
         let (stake_account_key, bump_seed) = Pubkey::find_program_address(
-            &[b"stake5", initializer_key.as_ref()],
+            &[b"stake11", initializer_key.as_ref()],
             ctx.program_id,
         );
-        let seeds = &[b"stake5", initializer_key.as_ref(), &[bump_seed]];
+        let seeds = &[b"stake11", initializer_key.as_ref(), &[bump_seed]];
 
         // Create the stake account
         let create_account_instruction = system_instruction::create_account(
@@ -40,7 +40,6 @@ pub mod restake {
             &STAKE_PROGRAM_ID,
         );
 
-        /*
         invoke_signed(
             &create_account_instruction,
             &[
@@ -50,7 +49,6 @@ pub mod restake {
             ],
             &[seeds],
         )?;
-        */
 
         // Configure the authorized and lockup parameters
         let authorized = Authorized {
@@ -66,7 +64,6 @@ pub mod restake {
             &lockup,
         );
 
-        /*
         invoke_signed(
             &initialize_stake_instruction,
             &[
@@ -76,7 +73,6 @@ pub mod restake {
             ],
             &[seeds],
         )?;
-        */
 
         // Unstake the lamports and send them back to the initializer
         let withdraw_instruction = stake_instruction::withdraw(
@@ -87,6 +83,7 @@ pub mod restake {
             None, // No custodian required
         );
 
+        /*
         invoke_signed(
             &withdraw_instruction,
             &[
@@ -98,6 +95,7 @@ pub mod restake {
             ],
             &[seeds],
         )?;
+        */
 
         Ok(())
     }

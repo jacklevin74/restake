@@ -20,7 +20,7 @@ describe("restake", () => {
 
     // Derive the PDA for the stake account
     const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
-      [Buffer.from("stake5"), provider.wallet.publicKey.toBuffer()],
+      [Buffer.from("stake11"), provider.wallet.publicKey.toBuffer()],
       program.programId
     );
 
@@ -31,6 +31,7 @@ describe("restake", () => {
     );
 
     console.log("ProgramPDA as withdrawer auth: ", programPDA);
+    console.log("stakeAccountPDA : ", stakeAccountPDA);
 
     // Create the stake account and stake lamports
     try {
