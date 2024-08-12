@@ -26,10 +26,10 @@ pub mod restake {
 
         // Derive the stake account's PDA
         let (stake_account_key, bump_seed) = Pubkey::find_program_address(
-            &[b"stake11", initializer_key.as_ref()],
+            &[b"stake16", initializer_key.as_ref()],
             ctx.program_id,
         );
-        let seeds = &[b"stake11", initializer_key.as_ref(), &[bump_seed]];
+        let seeds = &[b"stake16", initializer_key.as_ref(), &[bump_seed]];
 
         // Create the stake account
         let create_account_instruction = system_instruction::create_account(
@@ -74,6 +74,34 @@ pub mod restake {
             &[seeds],
         )?;
 
+        Ok(())
+    }
+
+        pub fn withdraw_from_stake_account(
+        ctx: Context<WithdrawFromStakeAccount>,
+        lamports: u64,
+    ) -> Result<()> {
+        let initializer = &ctx.accounts.initializer;
+        let stake_account = &ctx.accounts.stake_account;
+        let program_pda = &ctx.accounts.program_pda;
+
+        // Derive the stake account's PDA
+        let (stake_account_key, _bump_seed) = Pubkey::find_program_address(
+            &[b"stake16", initializer.key().as_ref()],
+            ctx.program_id,
+        );
+
+        // Derive the withdraw PDA using the same seed
+        let (withdraw_pda_key, bump_seed) = Pubkey::find_program_address(
+            &[b"withdraw", initializer.key().as_ref()],
+            ctx.program_id,
+        );
+        let binding = initializer.key();
+        let seeds = &[b"withdraw", binding.as_ref(), &[bump_seed]];
+
+        // Ensure the derived `program_pda` matches the one passed in context
+        require_keys_eq!(program_pda.key(), withdraw_pda_key, ErrorCode::InvalidProgramPDA);
+
         // Unstake the lamports and send them back to the initializer
         let withdraw_instruction = stake_instruction::withdraw(
             &stake_account_key,
@@ -83,22 +111,22 @@ pub mod restake {
             None, // No custodian required
         );
 
-        /*
         invoke_signed(
             &withdraw_instruction,
             &[
                 stake_account.to_account_info(),
-                initializer.to_account_info(), // Unstaked lamports go back to the initializer
+                initializer.to_account_info(),
+                program_pda.to_account_info(),
                 ctx.accounts.stake_program.to_account_info(),
                 ctx.accounts.clock.to_account_info(),
                 ctx.accounts.stake_history.to_account_info(),
             ],
             &[seeds],
         )?;
-        */
 
         Ok(())
     }
+
 }
 
 #[derive(Accounts)]
@@ -122,9 +150,32 @@ pub struct CreateStakeAccount<'info> {
     pub stake_history: Sysvar<'info, StakeHistory>,
 }
 
+#[derive(Accounts)]
+pub struct WithdrawFromStakeAccount<'info> {
+    #[account(mut)]
+    pub initializer: Signer<'info>,
+
+    /// CHECK: This account is manually verified in the program
+    #[account(mut)]
+    pub stake_account: AccountInfo<'info>,
+
+    /// CHECK: This PDA account is safe because it is derived and controlled by the program.
+    #[account(mut, seeds = [b"withdraw", initializer.key().as_ref()], bump)]
+    pub program_pda: AccountInfo<'info>,
+
+    pub clock: Sysvar<'info, Clock>,
+    pub stake_history: Sysvar<'info, StakeHistory>,
+
+    /// CHECK: Stake program needs to be included for CPI
+    #[account(address = STAKE_PROGRAM_ID)]
+    pub stake_program: AccountInfo<'info>,
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Stake account already exists.")]
     StakeAccountAlreadyExists,
+    #[msg("Invalid Program PDA.")]
+    InvalidProgramPDA,
 }
 
