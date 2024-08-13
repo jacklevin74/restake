@@ -28,10 +28,10 @@ pub mod restake {
 
         let initializer_key = initializer.key();
         let (stake_account_key, bump_seed) = Pubkey::find_program_address(
-            &[b"stake16", initializer_key.as_ref()],
+            &[b"stake17", initializer_key.as_ref()],
             ctx.program_id,
         );
-        let seeds = &[b"stake16", initializer_key.as_ref(), &[bump_seed]];
+        let seeds = &[b"stake17", initializer_key.as_ref(), &[bump_seed]];
 
         let create_account_instruction = system_instruction::create_account(
             &initializer_key,
@@ -52,7 +52,7 @@ pub mod restake {
         )?;
 
         let authorized = Authorized {
-            staker: initializer_key,
+            staker: program_pda.key(),
             withdrawer: program_pda.key(),
         };
         let lockup = Lockup::default();
@@ -85,7 +85,7 @@ pub mod restake {
         let program_pda = &ctx.accounts.program_pda;
 
         let (stake_account_key, _bump_seed) = Pubkey::find_program_address(
-            &[b"stake16", initializer.key().as_ref()],
+            &[b"stake17", initializer.key().as_ref()],
             ctx.program_id,
         );
 
@@ -131,11 +131,16 @@ pub mod restake {
             &[b"withdraw", initializer.key().as_ref()],
             ctx.program_id,
         );
-
+        let (stake_program_pda, stake_bump_seed) = Pubkey::find_program_address(
+            &[b"stake17", initializer.key().as_ref()],
+            ctx.program_id,
+        );
         require_keys_eq!(program_pda.key(), derived_program_pda, ErrorCode::InvalidProgramPDA);
+        require_keys_eq!(stake_account.key(), stake_program_pda, ErrorCode::InvalidProgramPDA);
 
         let binding = initializer.key();
         let seeds = &[b"withdraw", binding.as_ref(), &[bump_seed]];
+        let stake_program_pda_seeds = &[b"stake17", binding.as_ref(), &[stake_bump_seed]];
 
         let delegate_instruction = stake_instruction::delegate_stake(
             &stake_account.key(),
@@ -210,11 +215,12 @@ pub struct Delegate<'info> {
     pub initializer: Signer<'info>,
 
     /// CHECK: This account is manually verified in the program
-    #[account(mut)]
+    #[account(mut, seeds = [b"stake17", initializer.key().as_ref()], bump)]
     pub stake_account: AccountInfo<'info>,
 
     /// CHECK: This PDA account is safe because it is derived and controlled by the program.
     #[account(mut, seeds = [b"withdraw", initializer.key().as_ref()], bump)]
+    //#[account(mut)]
     pub program_pda: AccountInfo<'info>,
 
     pub clock: Sysvar<'info, Clock>,

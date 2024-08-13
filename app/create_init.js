@@ -11,7 +11,7 @@ const connection = provider.connection;
 async function createAndInitializeStakeAccount(lamports) {
   // Derive PDAs
   const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
-    [Buffer.from("stake16"), provider.wallet.publicKey.toBuffer()],
+    [Buffer.from("stake17"), provider.wallet.publicKey.toBuffer()],
     program.programId
   );
 
@@ -59,7 +59,7 @@ async function createAndInitializeStakeAccount(lamports) {
 async function withdrawFromStakeAccount(lamports) {
   // Derive PDAs
   const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
-    [Buffer.from("stake16"), provider.wallet.publicKey.toBuffer()],
+    [Buffer.from("stake17"), provider.wallet.publicKey.toBuffer()],
     program.programId
   );
 
@@ -101,7 +101,7 @@ async function withdrawFromStakeAccount(lamports) {
 async function delegateToVoter(voterPubkey) {
   // Derive PDAs
   const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
-    [Buffer.from("stake16"), provider.wallet.publicKey.toBuffer()],
+    [Buffer.from("stake17"), provider.wallet.publicKey.toBuffer()],
     program.programId
   );
 
@@ -132,7 +132,6 @@ async function delegateToVoter(voterPubkey) {
       .rpc({
         // Add the signers for the transaction, specifying the PDA with its derived seeds
         skipPreflight: false,
-        preflightCommitment: "singleGossip",
       });
 
     console.log("Delegate transaction signature:", delegateTx);
