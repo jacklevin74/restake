@@ -40,7 +40,7 @@ async function createAndInitializeStakeAccount(lamports) {
           stakeProgram: anchor.web3.StakeProgram.programId,
           programPda: programPDA,
         })
-        .signers([provider.wallet.payer])
+        .signers([])  // No signers needed because the PDA signs via invoke_signed
         .rpc();
 
       console.log("Create stake account transaction signature:", createTx);
@@ -80,10 +80,10 @@ async function withdrawFromStakeAccount(lamports) {
         stakeAccount: stakeAccountPDA,
         programPda: programPDA,
         clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-        stakeHistory: anchor.web3.SYSVAR_STAKE_HISTORY_PUBKEY,
         stakeProgram: anchor.web3.StakeProgram.programId,
+        stakeHistory: anchor.web3.SYSVAR_STAKE_HISTORY_PUBKEY,
       })
-      .signers([provider.wallet.payer])
+      .signers([])  // No signers needed because the PDA signs via invoke_signed
       .rpc();
 
     console.log("Withdrawal transaction signature:", withdrawTx);
@@ -98,15 +98,82 @@ async function withdrawFromStakeAccount(lamports) {
   }
 }
 
+async function delegateToVoter(voterPubkey) {
+  // Derive PDAs
+  const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
+    [Buffer.from("stake16"), provider.wallet.publicKey.toBuffer()],
+    program.programId
+  );
+
+  const [programPDA, programBump] = await PublicKey.findProgramAddress(
+    [Buffer.from("withdraw"), provider.wallet.publicKey.toBuffer()],
+    program.programId
+  );
+
+  console.log("ProgramPDA as withdrawer auth:", programPDA.toString());
+  console.log("stakeAccountPDA:", stakeAccountPDA.toString());
+  console.log("Voter PublicKey:", voterPubkey.toString());
+
+  try {
+    // Delegate stake to voterPubkey
+    const delegateTx = await program.methods
+      .delegate(voterPubkey)
+      .accounts({
+        initializer: provider.wallet.publicKey,
+        stakeAccount: stakeAccountPDA,
+        programPda: programPDA,
+        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
+        stakeProgram: anchor.web3.StakeProgram.programId,
+        stakeHistory: anchor.web3.SYSVAR_STAKE_HISTORY_PUBKEY,
+        stakeConfig: anchor.web3.SYSVAR_STAKE_CONFIG_PUBKEY,  // Include the stake config account
+        voter: voterPubkey, // Include the voter account
+      })
+      .signers([])  // No external signers, PDA signs internally
+      .rpc({
+        // Add the signers for the transaction, specifying the PDA with its derived seeds
+        skipPreflight: false,
+        preflightCommitment: "singleGossip",
+      });
+
+    console.log("Delegate transaction signature:", delegateTx);
+
+  } catch (err) {
+    console.error("Delegation failed with error:", err);
+    if (err.logs) {
+      console.log("Transaction logs:", err.logs);
+    }
+  }
+}
+
+
 // Handle CLI arguments
 const action = process.argv[2];
-const lamports = parseFloat(process.argv[3]) * anchor.web3.LAMPORTS_PER_SOL;
+
+let voterPubkey;
+
+if (action === 'delegate') {
+  if (process.argv[3]) {
+    try {
+      voterPubkey = new PublicKey(process.argv[3]);
+    } catch (err) {
+      console.error("Invalid voter public key provided:", process.argv[3]);
+      process.exit(1);
+    }
+  } else {
+    console.error("Please provide a voter public key for delegation.");
+    process.exit(1);
+  }
+}
 
 if (action === 'init') {
+  const lamports = parseFloat(process.argv[3]) * anchor.web3.LAMPORTS_PER_SOL;
   createAndInitializeStakeAccount(lamports);
 } else if (action === 'withdraw') {
+  const lamports = parseFloat(process.argv[3]) * anchor.web3.LAMPORTS_PER_SOL;
   withdrawFromStakeAccount(lamports);
+} else if (action === 'delegate') {
+  delegateToVoter(voterPubkey);
 } else {
-  console.log("Invalid action. Use 'init' to create/initialize or 'withdraw' to withdraw lamports.");
+  console.log("Invalid action. Use 'init' to create/initialize, 'withdraw' to withdraw lamports, or 'delegate' to delegate to a voter account.");
 }
 
