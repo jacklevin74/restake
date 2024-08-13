@@ -144,6 +144,47 @@ async function delegateToVoter(voterPubkey) {
   }
 }
 
+async function undelegateFromVoter() {
+  // Derive PDAs
+  const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
+    [Buffer.from("stake17"), provider.wallet.publicKey.toBuffer()],
+    program.programId
+  );
+
+  const [programPDA, programBump] = await PublicKey.findProgramAddress(
+    [Buffer.from("withdraw"), provider.wallet.publicKey.toBuffer()],
+    program.programId
+  );
+
+  console.log("ProgramPDA as withdrawer auth:", programPDA.toString());
+  console.log("stakeAccountPDA:", stakeAccountPDA.toString());
+
+  try {
+    // Undelegate stake from the current vote account
+    const undelegateTx = await program.methods
+      .undelegate()
+      .accounts({
+        initializer: provider.wallet.publicKey,
+        stakeAccount: stakeAccountPDA,
+        programPda: programPDA,
+        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
+        stakeProgram: anchor.web3.StakeProgram.programId,
+        stakeHistory: anchor.web3.SYSVAR_STAKE_HISTORY_PUBKEY,
+      })
+      .signers([])  // No external signers, PDA signs internally
+      .rpc({
+        skipPreflight: false,
+      });
+
+    console.log("Undelegate transaction signature:", undelegateTx);
+
+  } catch (err) {
+    console.error("Undelegation failed with error:", err);
+    if (err.logs) {
+      console.log("Transaction logs:", err.logs);
+    }
+  }
+}
 
 // Handle CLI arguments
 const action = process.argv[2];
@@ -172,7 +213,9 @@ if (action === 'init') {
   withdrawFromStakeAccount(lamports);
 } else if (action === 'delegate') {
   delegateToVoter(voterPubkey);
+} else if (action === 'undelegate') {
+  undelegateFromVoter();
 } else {
-  console.log("Invalid action. Use 'init' to create/initialize, 'withdraw' to withdraw lamports, or 'delegate' to delegate to a voter account.");
+  console.log("Invalid action. Use 'init' to create/initialize, 'withdraw' to withdraw lamports, 'delegate' to delegate to a voter account, or 'undelegate' to undelegate from a voter account.");
 }
 

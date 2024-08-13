@@ -9,7 +9,7 @@ use solana_program::{
     system_instruction,
 };
 
-declare_id!("FGmyMg3A1eTBNaVu8iy8vHFiEsB8PG5QijzcKxQ2nfgX");
+declare_id!("GRkByZX5pRMwceDhBb9P9qiio7ivn6SZcZyRMpk2ohGg");
 
 // Hardcoded public key for the Stake Config Sysvar
 const STAKE_CONFIG_PUBKEY: &str = "StakeConfig11111111111111111111111111111111";
@@ -140,7 +140,7 @@ pub mod restake {
 
         let binding = initializer.key();
         let seeds = &[b"withdraw", binding.as_ref(), &[bump_seed]];
-        let stake_program_pda_seeds = &[b"stake17", binding.as_ref(), &[stake_bump_seed]];
+        let _stake_program_pda_seeds = &[b"stake17", binding.as_ref(), &[stake_bump_seed]];
 
         let delegate_instruction = stake_instruction::delegate_stake(
             &stake_account.key(),
@@ -164,7 +164,42 @@ pub mod restake {
 
         Ok(())
     }
+    pub fn undelegate(ctx: Context<Undelegate>) -> Result<()> {
+    let initializer = &ctx.accounts.initializer;
+    let stake_account = &ctx.accounts.stake_account;
+    let program_pda = &ctx.accounts.program_pda;
+
+    let (withdraw_pda, bump_seed) = Pubkey::find_program_address(
+        &[b"withdraw", initializer.key().as_ref()],
+        ctx.program_id,
+    );
+
+    require_keys_eq!(program_pda.key(), withdraw_pda, ErrorCode::InvalidProgramPDA);
+
+    let binding = initializer.key();
+    let seeds = &[b"withdraw", binding.as_ref(), &[bump_seed]];
+
+    let deactivate_instruction = stake_instruction::deactivate_stake(
+        &stake_account.key(),
+        &program_pda.key(),
+    );
+
+    invoke_signed(
+        &deactivate_instruction,
+        &[
+            stake_account.to_account_info(),
+            program_pda.to_account_info(),
+            ctx.accounts.clock.to_account_info(),
+            ctx.accounts.stake_program.to_account_info(),
+        ],
+        &[seeds],
+    )?;
+
+    Ok(())
 }
+
+}
+
 
 #[derive(Accounts)]
 pub struct CreateStakeAccount<'info> {
@@ -237,6 +272,29 @@ pub struct Delegate<'info> {
     #[account(address = Pubkey::from_str(STAKE_CONFIG_PUBKEY).unwrap())]
     pub stake_config: AccountInfo<'info>,
 }
+
+#[derive(Accounts)]
+pub struct Undelegate<'info> {
+    #[account(mut)]
+    pub initializer: Signer<'info>,
+
+    /// CHECK: This account is manually verified in the program
+    #[account(mut, seeds = [b"stake17", initializer.key().as_ref()], bump)]
+    pub stake_account: AccountInfo<'info>,
+
+    /// CHECK: This PDA account is safe because it is derived and controlled by the program.
+    #[account(mut, seeds = [b"withdraw", initializer.key().as_ref()], bump)]
+    pub program_pda: AccountInfo<'info>,
+
+    pub clock: Sysvar<'info, Clock>,
+
+    /// CHECK: Stake program needs to be included for CPI
+    #[account(address = STAKE_PROGRAM_ID)]
+    pub stake_program: AccountInfo<'info>,
+
+    pub stake_history: Sysvar<'info, StakeHistory>,
+}
+
 
 #[error_code]
 pub enum ErrorCode {

@@ -19,3 +19,9 @@ node app/create_init.js delegate 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L
 solana stakes 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L (to see if delegation worked)
 solana stake-account EJmmw28PEAH66pjGGiXRB6TBJpwu1DoTuxHAviZcqvp6 (to see status of the stake account)
 
+continue with undelegate:
+
+node app/create_init.js undelegate 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L
+
+solana stakes 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L (to see if delegation worked)
+solana stake-account EJmmw28PEAH66pjGGiXRB6TBJpwu1DoTuxHAviZcqvp6 (to see status of the stake account)
