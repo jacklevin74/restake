@@ -1,0 +1,21 @@
+restake program is actiong like stake account creator/initializer, acting as a proxy to control
+all stake, withdraw and delegate actions.  Program creates PDA accounts for both staking account
+and withdrawer authority linked to the user's wallet key. 
+
+To deploy:
+
+anchor build
+anchor deploy (you will see program_id)
+Copy program_id into lib.rs (top of the file)
+
+anchor build && anchor deploy (program will deploy with your program_id)
+
+To run tests:
+
+node app/create_init.js init 1.5
+node app/create_init.js withdraw 0.2
+node app/create_init.js delegate 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L
+
+solana stakes 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L (to see if delegation worked)
+solana stake-account EJmmw28PEAH66pjGGiXRB6TBJpwu1DoTuxHAviZcqvp6 (to see status of the stake account)
+
