@@ -1,4 +1,4 @@
-restake program is actiong like stake account creator/initializer, acting as a proxy to control
+restake program is acting like stake account creator/initializer, working as a proxy to control
 all stake, withdraw and delegate actions.  Program creates PDA accounts for both staking account
 and withdrawer authority linked to the user's wallet key. 
 
