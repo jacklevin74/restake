@@ -98,7 +98,7 @@ async function withdrawFromStakeAccount(lamports) {
   }
 }
 
-async function delegateToVoter(voterPubkey) {
+async function delegateToVoter(voterPubkey, lock) {
   // Derive PDAs
   const [stakeAccountPDA, _] = await PublicKey.findProgramAddress(
     [Buffer.from("stake17"), provider.wallet.publicKey.toBuffer()],
@@ -113,11 +113,12 @@ async function delegateToVoter(voterPubkey) {
   console.log("ProgramPDA as withdrawer auth:", programPDA.toString());
   console.log("stakeAccountPDA:", stakeAccountPDA.toString());
   console.log("Voter PublicKey:", voterPubkey.toString());
+  console.log("Lock is set to:", lock);
 
   try {
-    // Delegate stake to voterPubkey
+    // Delegate stake to voterPubkey with lock parameter
     const delegateTx = await program.methods
-      .delegate(voterPubkey)
+      .delegate(voterPubkey, lock)
       .accounts({
         initializer: provider.wallet.publicKey,
         stakeAccount: stakeAccountPDA,
@@ -190,6 +191,7 @@ async function undelegateFromVoter() {
 const action = process.argv[2];
 
 let voterPubkey;
+let lock = false;
 
 if (action === 'delegate') {
   if (process.argv[3]) {
@@ -198,6 +200,9 @@ if (action === 'delegate') {
     } catch (err) {
       console.error("Invalid voter public key provided:", process.argv[3]);
       process.exit(1);
+    }
+    if (process.argv[4]) {
+      lock = process.argv[4].toLowerCase() === 'true';
     }
   } else {
     console.error("Please provide a voter public key for delegation.");
@@ -212,7 +217,7 @@ if (action === 'init') {
   const lamports = parseFloat(process.argv[3]) * anchor.web3.LAMPORTS_PER_SOL;
   withdrawFromStakeAccount(lamports);
 } else if (action === 'delegate') {
-  delegateToVoter(voterPubkey);
+  delegateToVoter(voterPubkey, lock);
 } else if (action === 'undelegate') {
   undelegateFromVoter();
 } else {

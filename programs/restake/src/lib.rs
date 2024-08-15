@@ -122,10 +122,11 @@ pub mod restake {
         Ok(())
     }
 
-    pub fn delegate(ctx: Context<Delegate>, voter_pubkey: Pubkey) -> Result<()> {
+    pub fn delegate(ctx: Context<Delegate>, voter_pubkey: Pubkey, lock: bool) -> Result<()> {
         let initializer = &ctx.accounts.initializer;
         let stake_account = &ctx.accounts.stake_account;
         let program_pda = &ctx.accounts.program_pda;
+        let clock = &ctx.accounts.clock;
 
         let (derived_program_pda, bump_seed) = Pubkey::find_program_address(
             &[b"withdraw", initializer.key().as_ref()],
@@ -155,15 +156,45 @@ pub mod restake {
                 program_pda.to_account_info(),
                 ctx.accounts.voter.to_account_info(),
                 ctx.accounts.stake_program.to_account_info(),
-                ctx.accounts.clock.to_account_info(),
+                clock.to_account_info(),
                 ctx.accounts.stake_history.to_account_info(),
                 ctx.accounts.stake_config.to_account_info(),  // Include the stake config account
             ],
             &[seeds],
         )?;
 
+        if lock {
+            // Create LockAccount PDA
+            let (lock_account_pda, lock_bump_seed) = Pubkey::find_program_address(
+                &[b"lock", initializer.key().as_ref()],
+                ctx.program_id,
+            );
+
+            let lock_seeds = &[b"lock", initializer.key().as_ref(), &[lock_bump_seed]];
+
+            require_keys_eq!(lock_account_pda, ctx.accounts.lock_account.key() , ErrorCode::InvalidProgramPDA);
+            msg!("Locking delegated stake in pda: {}", ctx.accounts.lock_account.key());
+
+            let lock_account = &mut ctx.accounts.lock_account;
+            lock_account.initializer = *initializer.key;
+            lock_account.delegated_lamports = stake_account.lamports();
+            lock_account.vote_account = voter_pubkey;
+            lock_account.block_id = clock.slot;
+            lock_account.lock = true;
+
+            let debug = true;
+
+            if debug {
+                msg!("Initializer set to: {:?}", initializer.key);
+                msg!("Delegated lamports set to: {}", stake_account.lamports());
+                msg!("Vote account set to: {:?}", voter_pubkey);
+                msg!("Block ID set to: {}", clock.slot);
+                msg!("Lock set to: {}", true);
+            }
+        }
         Ok(())
     }
+
     pub fn undelegate(ctx: Context<Undelegate>) -> Result<()> {
     let initializer = &ctx.accounts.initializer;
     let stake_account = &ctx.accounts.stake_account;
@@ -173,8 +204,16 @@ pub mod restake {
         &[b"withdraw", initializer.key().as_ref()],
         ctx.program_id,
     );
+    let (stake_account_pda, stake_bump_seed) = Pubkey::find_program_address(
+        &[b"stake17", initializer.key().as_ref()],
+        ctx.program_id,
+    );
 
     require_keys_eq!(program_pda.key(), withdraw_pda, ErrorCode::InvalidProgramPDA);
+    require_keys_eq!(stake_account.key(), stake_account_pda, ErrorCode::InvalidProgramPDA);
+
+    // Additional Ownership Check
+    require!(*stake_account.owner == STAKE_PROGRAM_ID, ErrorCode::IncorrectOwner);
 
     let binding = initializer.key();
     let seeds = &[b"withdraw", binding.as_ref(), &[bump_seed]];
@@ -271,6 +310,11 @@ pub struct Delegate<'info> {
     /// CHECK: The stake config sysvar
     #[account(address = Pubkey::from_str(STAKE_CONFIG_PUBKEY).unwrap())]
     pub stake_config: AccountInfo<'info>,
+
+    /// CHECK: Lock account PDA, created only if `lock` is true
+    #[account(init_if_needed, seeds = [b"lock", initializer.key().as_ref()], bump, payer = initializer, space = 8 + 8 + 32 + 8 + 32 + 8 + 1)]
+    pub lock_account: Account<'info, LockAccount>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -278,7 +322,7 @@ pub struct Undelegate<'info> {
     #[account(mut)]
     pub initializer: Signer<'info>,
 
-    /// CHECK: This account is manually verified in the program
+    /// CHECK: This is a PDA account
     #[account(mut, seeds = [b"stake17", initializer.key().as_ref()], bump)]
     pub stake_account: AccountInfo<'info>,
 
@@ -295,6 +339,16 @@ pub struct Undelegate<'info> {
     pub stake_history: Sysvar<'info, StakeHistory>,
 }
 
+#[account]
+pub struct LockAccount {
+    pub initializer: Pubkey,
+    pub delegated_lamports: u64,
+    pub vote_account: Pubkey,
+    pub block_id: u64,
+    pub lock: bool,
+}
+
+
 
 #[error_code]
 pub enum ErrorCode {
@@ -302,5 +356,7 @@ pub enum ErrorCode {
     StakeAccountAlreadyExists,
     #[msg("Invalid Program PDA.")]
     InvalidProgramPDA,
+    #[msg("Wrong Program PDA owner.")]
+    IncorrectOwner,
 }
 

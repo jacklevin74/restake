@@ -12,6 +12,9 @@ anchor build && anchor deploy (program will deploy with your program_id)
 
 To run tests:
 
+export ANCHOR_WALLET=~/.config/solana/id.json
+export ANCHOR_PROVIDER_URL=https://xolana.xen.network
+
 node app/create_init.js init 1.5
 node app/create_init.js withdraw 0.2
 node app/create_init.js delegate 5pgr855zqcD87Qd81DFbCJvvfk1HhTKhSpGG2Bxre75L
